@@ -21,12 +21,12 @@ The project makes use of the following tools;
 
 ### Resources
 
-(Unity Game Engine + Matlab)[https://www.mathworks.com/help/ros/ug/set-up-and-connect-to-unity-game-engine.html]
+[Unity Game Engine + Matlab](https://www.mathworks.com/help/ros/ug/set-up-and-connect-to-unity-game-engine.html)
 
-(Matlab Roadrunner)[https://www.mathworks.com/products/roadrunner.html]
+[Matlab Roadrunner](https://www.mathworks.com/products/roadrunner.html)
 
 ### 3D Assets
 
-(Blender Kit)[https://www.blenderkit.com/]
+[Blender Kit](https://www.blenderkit.com/)
 
-(SketchFab)[https://sketchfab.com/]
+[SketchFab](https://sketchfab.com/)
