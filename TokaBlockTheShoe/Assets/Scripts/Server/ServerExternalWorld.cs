@@ -7,84 +7,101 @@ using UnityEngine;
 
 public class ServerExternalWorld : MonoBehaviour
 {
-    // port must match MATLAB sender
     const int Port = 6700;
+
     TcpListener listener;
     TcpClient client;
     NetworkStream netStream;
     StreamReader reader;
 
-    // Called once when the GameObject (ServerExternalWorld) becomes active
     void Start()
     {
         try
         {
-            listener = new TcpListener(IPAddress.Loopback, Port);
+            // Listen on ALL interfaces (LAN + localhost)
+            listener = new TcpListener(IPAddress.Any, Port);
             listener.Start();
-            Debug.Log($"[ServerExternalWorld] Listening on {IPAddress.Loopback}:{Port}");
+
+            Debug.Log($"[ServerExternalWorld] Listening on 0.0.0.0:{Port}");
         }
         catch (Exception ex)
         {
-            Debug.LogError($"[ServerExternalWorld] Failed to start TcpListener: {ex}");
+            Debug.LogError($"[ServerExternalWorld] Failed to start listener: {ex}");
         }
     }
 
-    // Update is called once per frame
     void Update()
     {
-        try
+        // 1. Accept new client if none connected
+        if (listener != null && listener.Pending() && client == null)
         {
-            // If there's a pending connection accept it
-            if (listener != null && listener.Pending() && client == null)
+            try
             {
                 client = listener.AcceptTcpClient();
+                client.NoDelay = true;
+
                 netStream = client.GetStream();
                 reader = new StreamReader(netStream, Encoding.UTF8);
-                Debug.Log("[ServerExternalWorld] Client connected");
-            }
 
-            // If connected and data available, read it (non-blocking)
-            if (client != null && netStream != null && netStream.DataAvailable)
+                Debug.Log("[ServerExternalWorld] Client connected.");
+            }
+            catch (Exception ex)
             {
-                // Read up to available bytes as a string
-                string msg = reader.ReadToEnd(); // small messages are fine; for streaming consider Read/ReadAsync
+                Debug.LogError($"[ServerExternalWorld] Accept error: {ex}");
+            }
+        }
+
+        // 2. If connected and data is available, read it
+        if (client != null && netStream != null && netStream.DataAvailable)
+        {
+            try
+            {
+                // Read one newline-terminated message
+                string msg = reader.ReadLine();
+
                 if (!string.IsNullOrEmpty(msg))
                 {
                     Debug.Log($"[ServerExternalWorld] Received: {msg}");
-                    // Example: parse numeric value and move the object
-                    // Try parse a number and move along x-axis
-                    // UNMARSHALLING GOES HERE
+
+                    // Example: parse number and move object
                     if (float.TryParse(msg.Trim(), out float x))
                     {
-                        transform.position = new Vector3(x, transform.position.y, transform.position.z);
+                        Vector3 pos = transform.position;
+                        pos.x = x;
+                        transform.position = pos;
                     }
                 }
-
-                // Close client after reading one message
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[ServerExternalWorld] Read error: {ex}");
                 CleanupClient();
             }
         }
-        catch (Exception ex)
+
+        // 3. Clean up if client disconnected
+        if (client != null && !client.Connected)
         {
-            Debug.LogError($"[ServerExternalWorld] Update error: {ex}");
             CleanupClient();
         }
     }
 
-    void OnApplicationQuit()
-    {
-        // clean up on exit
-        try { CleanupClient(); } catch { }
-        try { listener?.Stop(); } catch { }
-    }
-
     void CleanupClient()
     {
+        Debug.Log("[ServerExternalWorld] Cleaning up client...");
+
         try { reader?.Close(); } catch { }
         try { netStream?.Close(); } catch { }
         try { client?.Close(); } catch { }
-        client = null;
-        netStream = null;
+
         reader = null;
+        netStream = null;
+        client = null;
+    }
+
+    void OnApplicationQuit()
+    {
+        CleanupClient();
+        try { listener?.Stop(); } catch { }
     }
 }
