@@ -14,11 +14,16 @@ public class ServerExternalWorld : MonoBehaviour
 
     volatile float latestX = float.NaN;
 
+    private VehicleController vehicleController;
+
     void Start()
     {
+        vehicleController = GetComponent<VehicleController>();
+
         listenerThread = new Thread(ServerThread);
         listenerThread.IsBackground = true;
         listenerThread.Start();
+
         Debug.Log("[TCP] Server thread started");
     }
 
@@ -42,7 +47,7 @@ public class ServerExternalWorld : MonoBehaviour
                     Debug.Log("[TCP] Received: " + line);
 
                     if (float.TryParse(line, out float x))
-                        latestX = x;   // thread-safe write
+                        latestX = x;
                 }
             }
         }
@@ -56,13 +61,8 @@ public class ServerExternalWorld : MonoBehaviour
     {
         if (!float.IsNaN(latestX))
         {
-            transform.position = new Vector3(
-                latestX,
-                transform.position.y,
-                transform.position.z
-            );
-
-            latestX = float.NaN; // consume
+            vehicleController.AddWaypointX(latestX);
+            latestX = float.NaN;
         }
     }
 

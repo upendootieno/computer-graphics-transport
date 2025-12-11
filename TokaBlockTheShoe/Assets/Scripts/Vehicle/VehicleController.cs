@@ -3,14 +3,14 @@ using System.Collections.Generic;
 
 public class VehicleController : MonoBehaviour
 {
-    public List<Vector3> Path;
     public float Speed = 10f;
 
+    private List<Vector3> Path = new List<Vector3>();
     private int currentIndex = 0;
 
     void Update()
     {
-        if (Path == null || currentIndex >= Path.Count)
+        if (Path == null || Path.Count == 0 || currentIndex >= Path.Count)
             return;
 
         Vector3 target = Path[currentIndex];
@@ -18,7 +18,19 @@ public class VehicleController : MonoBehaviour
 
         transform.position += dir * Speed * Time.deltaTime;
 
-        if (Vector3.Distance(transform.position, target) < 0.5f)
+        // Switch to next waypoint when close enough
+        if (Vector3.Distance(transform.position, target) < 0.2f)
             currentIndex++;
     }
+
+    // Called by the TCP script
+    public void AddWaypointX(float xValue)
+    {
+        Path.Add(new Vector3(
+            xValue,
+            transform.position.y,
+            transform.position.z
+        ));
+    }
 }
+
