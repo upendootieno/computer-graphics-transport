@@ -62,4 +62,11 @@ public class VehicleController : MonoBehaviour
     {
         return Path == null ? new List<Vector3>().AsReadOnly() : Path.AsReadOnly();
     }
+
+    public void SetFullPath(List<Vector3> newPath)
+    {
+        Path = newPath;
+        currentIndex = 0;
+    }
+
 }
