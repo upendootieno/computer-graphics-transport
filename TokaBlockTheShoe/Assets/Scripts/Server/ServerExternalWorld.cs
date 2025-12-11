@@ -1,154 +1,74 @@
+using UnityEngine;
 using System;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
-using UnityEngine;
+using System.Threading;
 
 public class ServerExternalWorld : MonoBehaviour
 {
     const int Port = 6700;
-
     TcpListener listener;
-    bool listenerStarted = false;
+    Thread listenerThread;
 
-    TcpClient client;
-    NetworkStream netStream;
-    StreamReader reader;
-
-    void Awake()
-    {
-        Debug.Log("[ServerExternalWorld] Awake() called.");
-    }
+    volatile float latestX = float.NaN;
 
     void Start()
     {
-        Debug.Log("[ServerExternalWorld] Start() called.");
-
-        TryStartListener();
+        listenerThread = new Thread(ServerThread);
+        listenerThread.IsBackground = true;
+        listenerThread.Start();
+        Debug.Log("[TCP] Server thread started");
     }
 
-    void TryStartListener()
+    void ServerThread()
     {
-        if (listenerStarted)
-        {
-            Debug.Log("[ServerExternalWorld] Listener already active.");
-            return;
-        }
-
         try
         {
             listener = new TcpListener(IPAddress.Any, Port);
             listener.Start();
-            listenerStarted = true;
+            Debug.Log("[TCP] Listening on ANY:" + Port);
 
-            Debug.Log($"[ServerExternalWorld] Listener started on 0.0.0.0:{Port}");
+            while (true)
+            {
+                TcpClient client = listener.AcceptTcpClient();
+                Debug.Log("[TCP] Client connected");
+
+                using (var stream = client.GetStream())
+                using (var reader = new StreamReader(stream, Encoding.UTF8))
+                {
+                    string line = reader.ReadLine();
+                    Debug.Log("[TCP] Received: " + line);
+
+                    if (float.TryParse(line, out float x))
+                        latestX = x;   // thread-safe write
+                }
+            }
         }
-        catch (Exception ex)
+        catch (Exception e)
         {
-            Debug.LogError("[ServerExternalWorld] Listener start FAILED: " + ex);
-            listenerStarted = false;
+            Debug.LogError("[TCP] Server error: " + e);
         }
     }
 
     void Update()
     {
-        // If listener isn't alive, try to restart it
-        if (!listenerStarted)
+        if (!float.IsNaN(latestX))
         {
-            TryStartListener();
-            return;
+            transform.position = new Vector3(
+                latestX,
+                transform.position.y,
+                transform.position.z
+            );
+
+            latestX = float.NaN; // consume
         }
-
-        if (listener == null || !listener.Server.IsBound)
-        {
-            Debug.LogWarning("[ServerExternalWorld] Listener exists but not bound. Restarting...");
-            listenerStarted = false;
-            TryStartListener();
-            return;
-        }
-
-        // 1. Accept client
-        if (client == null)
-        {
-            bool pending;
-            try { pending = listener.Pending(); }
-            catch (Exception ex)
-            {
-                Debug.LogError("[ServerExternalWorld] Pending() error: " + ex);
-                listenerStarted = false;
-                return;
-            }
-
-            if (pending)
-            {
-                Debug.Log("[ServerExternalWorld] Pending connection.");
-
-                try
-                {
-                    client = listener.AcceptTcpClient();
-                    client.NoDelay = true;
-
-                    netStream = client.GetStream();
-                    reader = new StreamReader(netStream, Encoding.UTF8);
-
-                    Debug.Log("[ServerExternalWorld] Client connected.");
-                }
-                catch (Exception ex)
-                {
-                    Debug.LogError("[ServerExternalWorld] Accept error: " + ex);
-                    CleanupClient();
-                }
-            }
-        }
-
-        // 2. Read data
-        if (client != null && netStream != null && netStream.DataAvailable)
-        {
-            try
-            {
-                string msg = reader.ReadLine();
-                Debug.Log("[ServerExternalWorld] Received: " + msg);
-
-                if (!string.IsNullOrEmpty(msg) &&
-                    float.TryParse(msg.Trim(), out float x))
-                {
-                    Vector3 p = transform.position;
-                    p.x = x;
-                    transform.position = p;
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError("[ServerExternalWorld] Read error: " + ex);
-                CleanupClient();
-            }
-        }
-
-        // 3. Cleanup if client disconnected
-        if (client != null && !client.Connected)
-        {
-            CleanupClient();
-        }
-    }
-
-    void CleanupClient()
-    {
-        Debug.Log("[ServerExternalWorld] Cleaning client.");
-        try { reader?.Close(); } catch { }
-        try { netStream?.Close(); } catch { }
-        try { client?.Close(); } catch { }
-
-        reader = null;
-        netStream = null;
-        client = null;
     }
 
     void OnApplicationQuit()
     {
-        Debug.Log("[ServerExternalWorld] Quitting, cleaning up.");
-        CleanupClient();
-        try { listener?.Stop(); } catch { }
-        listenerStarted = false;
+        listener?.Stop();
+        listenerThread?.Abort();
     }
 }
