@@ -12,6 +12,7 @@ public class ServerExternalWorld : MonoBehaviour
     TcpListener listener;
     Thread listenerThread;
 
+    // latest value written by server thread; consumed on main thread
     volatile float latestX = float.NaN;
 
     private VehicleController vehicleController;
@@ -19,6 +20,10 @@ public class ServerExternalWorld : MonoBehaviour
     void Start()
     {
         vehicleController = GetComponent<VehicleController>();
+        if (vehicleController == null)
+        {
+            Debug.LogError("[TCP] VehicleController component not found on this GameObject. Attach VehicleController.");
+        }
 
         listenerThread = new Thread(ServerThread);
         listenerThread.IsBackground = true;
@@ -37,19 +42,24 @@ public class ServerExternalWorld : MonoBehaviour
 
             while (true)
             {
-                TcpClient client = listener.AcceptTcpClient();
-                Debug.Log("[TCP] Client connected");
-
-                using (var stream = client.GetStream())
-                using (var reader = new StreamReader(stream, Encoding.UTF8))
+                using (TcpClient client = listener.AcceptTcpClient())
                 {
-                    string line = reader.ReadLine();
-                    Debug.Log("[TCP] Received: " + line);
+                    Debug.Log("[TCP] Client connected");
+                    using (var stream = client.GetStream())
+                    using (var reader = new StreamReader(stream, Encoding.UTF8))
+                    {
+                        string line = reader.ReadLine();
+                        Debug.Log("[TCP] Received: " + line);
 
-                    if (float.TryParse(line, out float x))
-                        latestX = x;
+                        if (float.TryParse(line, out float x))
+                            latestX = x;
+                    }
                 }
             }
+        }
+        catch (ThreadAbortException)
+        {
+            // expected on quit/abort
         }
         catch (Exception e)
         {
@@ -61,14 +71,31 @@ public class ServerExternalWorld : MonoBehaviour
     {
         if (!float.IsNaN(latestX))
         {
-            vehicleController.AddWaypointX(latestX);
-            latestX = float.NaN;
+            if (vehicleController != null)
+            {
+                // Use AddWaypointX or SetTargetX depending on behavior you want:
+                vehicleController.AddWaypointX(latestX);
+                // vehicleController.SetTargetX(latestX); // uncomment if you want single-target behavior
+            }
+            else
+            {
+                Debug.LogWarning("[TCP] Received X but no VehicleController to forward to.");
+            }
+
+            latestX = float.NaN; // consume
         }
     }
 
     void OnApplicationQuit()
     {
-        listener?.Stop();
-        listenerThread?.Abort();
+        try
+        {
+            listener?.Stop();
+            listenerThread?.Abort();
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning("[TCP] Error stopping thread: " + e);
+        }
     }
 }
