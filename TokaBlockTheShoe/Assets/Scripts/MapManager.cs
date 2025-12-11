@@ -37,7 +37,8 @@ public class MapManager : MonoBehaviour
             unityPath.Add(LatLonToWorld(n.Lat, n.Lon));
         }
 
-        Vehicle.Path = unityPath;
+        Vehicle.SetFullPath(unityPath);
+
     }
 
     Vector3 LatLonToWorld(double lat, double lon)
