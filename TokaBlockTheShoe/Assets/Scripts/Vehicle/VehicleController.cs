@@ -10,7 +10,7 @@ public class VehicleController : MonoBehaviour
 
     void Update()
     {
-        if (Path == null || Path.Count == 0 || currentIndex >= Path.Count)
+        if (Path.Count == 0 || currentIndex >= Path.Count)
             return;
 
         Vector3 target = Path[currentIndex];
@@ -18,12 +18,11 @@ public class VehicleController : MonoBehaviour
 
         transform.position += dir * Speed * Time.deltaTime;
 
-        // Switch to next waypoint when close enough
         if (Vector3.Distance(transform.position, target) < 0.2f)
             currentIndex++;
     }
 
-    // Called by the TCP script
+    // Add a new waypoint for continuous motion
     public void AddWaypointX(float xValue)
     {
         Path.Add(new Vector3(
@@ -32,5 +31,17 @@ public class VehicleController : MonoBehaviour
             transform.position.z
         ));
     }
-}
 
+    // OPTIONAL: If you want only a single active target at a time
+    public void SetTargetX(float xValue)
+    {
+        Path.Clear();
+        currentIndex = 0;
+
+        Path.Add(new Vector3(
+            xValue,
+            transform.position.y,
+            transform.position.z
+        ));
+    }
+}
