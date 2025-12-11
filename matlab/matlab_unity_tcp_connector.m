@@ -6,7 +6,7 @@ try
     disp("Connected to Unity.");
 
     % Send one newline-terminated message
-    x = 30;
+    x = 300;
     msg = sprintf("%.4f\n", x);
     write(t, uint8(char(msg)));
 
